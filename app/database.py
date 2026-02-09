@@ -13,7 +13,7 @@ class Database:
     def get_connection(self):
         """Obtiene conexión a la base de datos"""
         conn = sqlite3.connect(self.db_name)
-        conn.row_factory = sqlite3.Row  # Para acceder por nombre de columna
+        conn.row_factory = sqlite3.Row
         return conn
     
     def init_db(self):
@@ -45,34 +45,13 @@ class Database:
         )
         ''')
         
-        # Tabla de notificaciones
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS notificaciones (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarea_id INTEGER NOT NULL,
-            fecha_alerta TEXT NOT NULL,
-            enviada BOOLEAN DEFAULT 0,
-            FOREIGN KEY (tarea_id) REFERENCES tareas(id) ON DELETE CASCADE
-        )
-        ''')
-        
-        # Tabla de comandos de voz
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS comandos_voz (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            texto TEXT NOT NULL,
-            accion TEXT,
-            fecha_creacion TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        
         # Insertar categorías por defecto
         categorias_default = [
             ('Trabajo', 'Tareas relacionadas con el trabajo'),
             ('Personal', 'Tareas personales'),
             ('Hogar', 'Tareas del hogar'),
             ('Estudio', 'Tareas académicas'),
-            ('Salud', 'Tareas relacionadas con salud'),
+            ('Salud', 'Tareas de salud'),
             ('Finanzas', 'Tareas financieras')
         ]
         
@@ -80,26 +59,24 @@ class Database:
             cursor.execute('INSERT OR IGNORE INTO categorias (nombre, descripcion) VALUES (?, ?)', 
                           (nombre, descripcion))
         
-        # Insertar tareas de ejemplo
+        # Verificar si hay tareas de ejemplo
         cursor.execute("SELECT COUNT(*) FROM tareas")
         if cursor.fetchone()[0] == 0:
+            # Obtener IDs de categorías
+            cursor.execute("SELECT id, nombre FROM categorias")
+            categorias = {row['nombre']: row['id'] for row in cursor.fetchall()}
+            
             tareas_ejemplo = [
-                ('Revisar informe trimestral', 'Revisar datos y preparar presentación para la junta', 
-                 '2024-12-15', 'pendiente', 'alta', 1),
-                ('Comprar víveres semanales', 'Ir al supermercado para comprar alimentos de la semana', 
-                 '2024-11-30', 'pendiente', 'media', 3),
-                ('Estudiar para examen final', 'Repasar capítulos 5-8 del libro de texto', 
-                 '2024-12-10', 'pendiente', 'alta', 4),
-                ('Llamar al médico', 'Pedir cita para revisión anual', 
-                 None, 'completada', 'baja', 5),
-                ('Enviar reporte semanal', 'Enviar reporte de progreso por correo al equipo', 
-                 '2024-11-25', 'completada', 'media', 1),
-                ('Pagar factura de luz', 'Realizar pago de la factura eléctrica antes del vencimiento', 
-                 '2024-11-28', 'pendiente', 'alta', 6),
-                ('Hacer ejercicio', 'Ir al gimnasio por 1 hora', 
-                 '2024-11-27', 'pendiente', 'media', 5),
-                ('Reunión con equipo', 'Reunión semanal para revisar proyectos', 
-                 '2024-11-29', 'pendiente', 'alta', 1)
+                ('Revisar informe trimestral', 'Revisar datos y preparar presentación', 
+                 '2024-12-15', 'pendiente', 'alta', categorias.get('Trabajo')),
+                ('Comprar víveres', 'Ir al supermercado', 
+                 '2024-11-30', 'pendiente', 'media', categorias.get('Hogar')),
+                ('Estudiar para examen', 'Repasar capítulos 5-8', 
+                 '2024-12-10', 'pendiente', 'alta', categorias.get('Estudio')),
+                ('Llamar al médico', 'Pedir cita para revisión', 
+                 None, 'completada', 'baja', categorias.get('Salud')),
+                ('Enviar reporte semanal', 'Enviar por correo al equipo', 
+                 '2024-11-25', 'completada', 'media', categorias.get('Trabajo')),
             ]
             
             for tarea in tareas_ejemplo:
@@ -110,13 +87,13 @@ class Database:
         
         conn.commit()
         conn.close()
-        print(f"✅ Base de datos '{self.db_name}' inicializada correctamente")
+        print(f"✅ Base de datos '{self.db_name}' inicializada")
     
-    # ===== OPERACIONES PARA TAREAS =====
+    # ===== OPERACIONES CRUD =====
     
     def crear_tarea(self, titulo, descripcion="", fecha_limite=None, 
                    prioridad="media", categoria_id=None):
-        """Crea una nueva tarea en la base de datos"""
+        """HU01: Crear nueva tarea"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -131,7 +108,7 @@ class Database:
         return tarea_id
     
     def obtener_todas_tareas(self, categoria_filtro=None):
-        """Obtiene todas las tareas, opcionalmente filtradas por categoría"""
+        """HU02: Obtener todas las tareas"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -178,7 +155,7 @@ class Database:
         return tareas
     
     def obtener_tarea(self, tarea_id):
-        """Obtiene una tarea específica por ID"""
+        """Obtener una tarea específica"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -194,11 +171,10 @@ class Database:
         return tarea
     
     def actualizar_tarea(self, tarea_id, **kwargs):
-        """Actualiza una tarea existente"""
+        """HU03: Actualizar tarea existente"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # Construir consulta dinámica
         campos = []
         valores = []
         
@@ -222,7 +198,7 @@ class Database:
         return afectadas > 0
     
     def eliminar_tarea(self, tarea_id):
-        """Elimina una tarea por ID"""
+        """HU04: Eliminar tarea por ID"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -234,13 +210,11 @@ class Database:
         return afectadas > 0
     
     def marcar_como_completada(self, tarea_id):
-        """Marca una tarea como completada"""
+        """HU05: Marcar tarea como completada"""
         return self.actualizar_tarea(tarea_id, estado='completada')
     
-    # ===== OPERACIONES PARA CATEGORÍAS =====
-    
     def obtener_categorias(self):
-        """Obtiene todas las categorías"""
+        """Obtener todas las categorías"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -249,59 +223,8 @@ class Database:
         conn.close()
         return categorias
     
-    # ===== OPERACIONES PARA NOTIFICACIONES =====
-    
-    def crear_notificacion(self, tarea_id, fecha_alerta):
-        """Crea una notificación para una tarea"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-        INSERT INTO notificaciones (tarea_id, fecha_alerta)
-        VALUES (?, ?)
-        ''', (tarea_id, fecha_alerta))
-        
-        conn.commit()
-        notificacion_id = cursor.lastrowid
-        conn.close()
-        return notificacion_id
-    
-    # ===== OPERACIONES PARA VOZ =====
-    
-    def guardar_comando_voz(self, texto, accion=None):
-        """Guarda un comando de voz en la base de datos"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-        INSERT INTO comandos_voz (texto, accion)
-        VALUES (?, ?)
-        ''', (texto, accion))
-        
-        conn.commit()
-        comando_id = cursor.lastrowid
-        conn.close()
-        return comando_id
-    
-    def obtener_comandos_voz(self, limite=10):
-        """Obtiene los últimos comandos de voz"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-        SELECT * FROM comandos_voz 
-        ORDER BY fecha_creacion DESC 
-        LIMIT ?
-        ''', (limite,))
-        
-        comandos = cursor.fetchall()
-        conn.close()
-        return comandos
-    
-    # ===== ESTADÍSTICAS =====
-    
     def obtener_estadisticas(self):
-        """Obtiene estadísticas de las tareas"""
+        """Obtener estadísticas de las tareas"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
