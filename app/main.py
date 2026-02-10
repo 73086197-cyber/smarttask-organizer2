@@ -370,6 +370,413 @@ class CrearTareaDialog:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar la tarea:\n{str(e)}")
 # (Las clases EditarTareaDialog y EliminarTareaDialog se mantienen igual que antes,
+class EditarTareaDialog:
+    """HU03 - Editar tarea existente"""
+    def __init__(self, parent, tarea_id, callback=None):
+        self.top = tk.Toplevel(parent)
+        self.top.title("EDITAR TAREA")
+        self.top.geometry("500x500")
+        self.top.resizable(False, False)
+        
+        self.callback = callback
+        self.tarea_id = tarea_id
+        self.resultado = False
+        
+        self._cargar_tarea()
+        self._crear_widgets()
+        self._centrar_ventana(parent)
+    
+    def _centrar_ventana(self, parent):
+        self.top.update_idletasks()
+        width = self.top.winfo_width()
+        height = self.top.winfo_height()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.top.geometry(f'{width}x{height}+{x}+{y}')
+    
+    def _cargar_tarea(self):
+        """Cargar datos de la tarea desde la base de datos"""
+        try:
+            self.tarea = db.obtener_tarea(self.tarea_id)
+            if not self.tarea:
+                raise ValueError("Tarea no encontrada")
+        except Exception as e:
+            print(f"Error cargando tarea: {e}")
+            self.tarea = None
+    
+    def _crear_widgets(self):
+        if not self.tarea:
+            ttk.Label(self.top, text="Error: Tarea no encontrada", 
+                     font=("Arial", 12), foreground="red").pack(pady=50)
+            ttk.Button(self.top, text="Cerrar", 
+                      command=self.top.destroy).pack(pady=10)
+            return
+        
+        main_frame = ttk.Frame(self.top, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(main_frame, text=f"EDITAR TAREA ID: {self.tarea_id}", 
+                 font=("Arial", 14, "bold")).grid(row=0, column=0, columnspan=2, 
+                                                 pady=(0, 20), sticky="w")
+        
+        # Campos del formulario
+        campos = [
+            ("Título *", "entry", self.tarea['titulo']),
+            ("Descripción", "text", self.tarea['descripcion'] or ""),
+            ("Fecha Límite", "entry", self._formatear_fecha(self.tarea['fecha_limite'])),
+            ("Prioridad", "combo_pri", self.tarea['prioridad']),
+            ("Categoría", "combo_cat", self.tarea['categoria_nombre'] or "Seleccionar..."),
+            ("Estado", "combo_estado", self.tarea['estado'])
+        ]
+        
+        self.widgets = {}
+        row = 1
+        
+        for label_text, tipo, valor in campos:
+            ttk.Label(main_frame, text=label_text).grid(row=row, column=0, 
+                                                       padx=(0, 10), pady=5, 
+                                                       sticky="w")
+            
+            if tipo == "entry":
+                widget = ttk.Entry(main_frame, width=40)
+                widget.insert(0, valor)
+                widget.grid(row=row, column=1, pady=5, sticky="ew")
+                
+            elif tipo == "text":
+                widget = tk.Text(main_frame, width=40, height=4)
+                widget.insert("1.0", valor)
+                widget.grid(row=row, column=1, pady=5, sticky="ew")
+                
+            elif tipo == "combo_pri":
+                widget = ttk.Combobox(main_frame, values=["baja", "media", "alta"], 
+                                     state="readonly", width=38)
+                widget.set(valor)
+                widget.grid(row=row, column=1, pady=5, sticky="ew")
+                
+            elif tipo == "combo_cat":
+                categorias = db.obtener_categorias()
+                valores = ["Seleccionar..."] + [cat['nombre'] for cat in categorias]
+                widget = ttk.Combobox(main_frame, values=valores, 
+                                     state="readonly", width=38)
+                widget.set(valor if valor else "Seleccionar...")
+                widget.grid(row=row, column=1, pady=5, sticky="ew")
+            
+            elif tipo == "combo_estado":
+                widget = ttk.Combobox(main_frame, values=["pendiente", "completada", "vencida"], 
+                                     state="readonly", width=38)
+                widget.set(valor)
+                widget.grid(row=row, column=1, pady=5, sticky="ew")
+            
+            self.widgets[label_text.split()[0].lower()] = widget
+            row += 1
+        
+        main_frame.columnconfigure(1, weight=1)
+        
+        # Separador
+        ttk.Separator(main_frame, orient="horizontal").grid(row=row, column=0, 
+                                                           columnspan=2, 
+                                                           pady=20, sticky="ew")
+        row += 1
+        
+        # Botones
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=row, column=0, columnspan=2, pady=10)
+        
+        ttk.Button(btn_frame, text="💾 ACTUALIZAR", width=15,
+                  command=self._actualizar).pack(side=tk.RIGHT, padx=5)
+        
+        ttk.Button(btn_frame, text="❌ CANCELAR", width=15,
+                  command=self.top.destroy).pack(side=tk.RIGHT, padx=5)
+    
+    def _formatear_fecha(self, fecha_sql):
+        """Formatear fecha de SQL a DD/MM/AAAA"""
+        if not fecha_sql:
+            return ""
+        try:
+            fecha_obj = datetime.strptime(fecha_sql, "%Y-%m-%d")
+            return fecha_obj.strftime("%d/%m/%Y")
+        except:
+            return fecha_sql
+    
+    def _actualizar(self):
+        """Actualizar tarea en la base de datos"""
+        titulo = self.widgets['título'].get().strip()
+        if not titulo:
+            messagebox.showerror("Error", "El título es obligatorio")
+            return
+        
+        descripcion = ""
+        if 'descripción' in self.widgets:
+            descripcion = self.widgets['descripción'].get("1.0", tk.END).strip()
+        
+        fecha_text = self.widgets['fecha'].get().strip()
+        fecha_sql = None
+        if fecha_text:
+            try:
+                fecha_obj = datetime.strptime(fecha_text, "%d/%m/%Y")
+                fecha_sql = fecha_obj.strftime("%Y-%m-%d")
+                
+                from datetime import date
+                if fecha_obj.date() < date.today():
+                    messagebox.showerror("Error", "La fecha límite no puede ser en el pasado")
+                    return
+            except ValueError:
+                messagebox.showerror("Error", "Formato de fecha inválido. Use DD/MM/AAAA")
+                return
+        
+        prioridad = self.widgets['prioridad'].get()
+        categoria_nombre = self.widgets['categoría'].get()
+        estado = self.widgets['estado'].get()
+        
+        categoria_id = None
+        if categoria_nombre and categoria_nombre != "Seleccionar...":
+            categorias = db.obtener_categorias()
+            for cat in categorias:
+                if cat['nombre'] == categoria_nombre:
+                    categoria_id = cat['id']
+                    break
+        
+        try:
+            # Actualizar tarea
+            actualizado = db.actualizar_tarea(
+                self.tarea_id,
+                titulo=titulo,
+                descripcion=descripcion,
+                fecha_limite=fecha_sql,
+                prioridad=prioridad,
+                estado=estado,
+                categoria_id=categoria_id
+            )
+            
+            if actualizado:
+                self.resultado = True
+                if self.callback:
+                    self.callback()
+                
+                self.top.destroy()
+                messagebox.showinfo("Éxito", "Tarea actualizada correctamente")
+            else:
+                messagebox.showerror("Error", "No se pudo actualizar la tarea")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo actualizar la tarea:\n{str(e)}")
+
+class EliminarTareaDialog:
+    """HU04 - Eliminar tarea con confirmación paso a paso"""
+    def __init__(self, parent, tarea_id, callback=None):
+        self.top = tk.Toplevel(parent)
+        self.top.title("ELIMINAR TAREA - CONFIRMACIÓN")
+        self.top.geometry("500x400")
+        self.top.resizable(False, False)
+        
+        self.callback = callback
+        self.tarea_id = tarea_id
+        self.paso_actual = 1
+        self.total_pasos = 3
+        
+        self._cargar_tarea()
+        self._crear_widgets()
+        self._centrar_ventana(parent)
+    
+    def _centrar_ventana(self, parent):
+        self.top.update_idletasks()
+        width = self.top.winfo_width()
+        height = self.top.winfo_height()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.top.geometry(f'{width}x{height}+{x}+{y}')
+    
+    def _cargar_tarea(self):
+        """Cargar datos de la tarea"""
+        try:
+            self.tarea = db.obtener_tarea(self.tarea_id)
+            if not self.tarea:
+                raise ValueError("Tarea no encontrada")
+        except Exception as e:
+            print(f"Error cargando tarea: {e}")
+            self.tarea = None
+    
+    def _crear_widgets(self):
+        if not self.tarea:
+            ttk.Label(self.top, text="Error: Tarea no encontrada", 
+                     font=("Arial", 12), foreground="red").pack(pady=50)
+            ttk.Button(self.top, text="Cerrar", 
+                      command=self.top.destroy).pack(pady=10)
+            return
+        
+        main_frame = ttk.Frame(self.top, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Paso actual
+        paso_frame = ttk.Frame(main_frame)
+        paso_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        ttk.Label(paso_frame, text=f"PASO {self.paso_actual} de {self.total_pasos}", 
+                 font=("Arial", 11, "bold"), foreground="blue").pack(side=tk.LEFT)
+        
+        # Barra de progreso
+        progress_frame = ttk.Frame(main_frame)
+        progress_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        for i in range(self.total_pasos):
+            color = "blue" if i < self.paso_actual else "gray"
+            ttk.Label(progress_frame, text="⬤", 
+                     font=("Arial", 20), foreground=color).pack(side=tk.LEFT, padx=5)
+        
+        # Mostrar paso actual
+        self._mostrar_paso_actual(main_frame)
+    
+    def _mostrar_paso_actual(self, parent):
+        """Mostrar contenido del paso actual"""
+        # Limpiar contenido anterior
+        for widget in parent.winfo_children():
+            if widget not in [parent.winfo_children()[0], parent.winfo_children()[1]]:
+                widget.destroy()
+        
+        if self.paso_actual == 1:
+            self._mostrar_paso_1(parent)
+        elif self.paso_actual == 2:
+            self._mostrar_paso_2(parent)
+        elif self.paso_actual == 3:
+            self._mostrar_paso_3(parent)
+    
+    def _mostrar_paso_1(self, parent):
+        """Paso 1: Confirmar tarea a eliminar"""
+        # Título
+        ttk.Label(parent, text="⚠️ CONFIRMAR TAREA A ELIMINAR", 
+                 font=("Arial", 14, "bold"), foreground="orange").pack(pady=(0, 20))
+        
+        # Información de la tarea
+        info_frame = ttk.LabelFrame(parent, text=" INFORMACIÓN DE LA TAREA ", padding="15")
+        info_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        info_text = f"""TÍTULO: {self.tarea['titulo']}
+        
+DESCRIPCIÓN: {self.tarea['descripcion'] or 'Sin descripción'}
+        
+ESTADO: {self.tarea['estado'].upper()}
+PRIORIDAD: {self.tarea['prioridad'].upper()}
+CATEGORÍA: {self.tarea['categoria_nombre'] or 'Sin categoría'}"""
+        
+        ttk.Label(info_frame, text=info_text, font=("Arial", 10), 
+                 justify=tk.LEFT).pack(anchor="w")
+        
+        # Advertencia
+        ttk.Label(parent, text="Esta acción eliminará permanentemente la tarea.", 
+                 font=("Arial", 10, "bold"), foreground="red").pack(pady=(0, 20))
+        
+        # Botones
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(fill=tk.X)
+        
+        ttk.Button(btn_frame, text="✅ SÍ, CONTINUAR", 
+                  command=self._avanzar_paso, style="Danger.TButton").pack(side=tk.RIGHT, padx=5)
+        
+        ttk.Button(btn_frame, text="❌ NO, CANCELAR", 
+                  command=self.top.destroy).pack(side=tk.RIGHT, padx=5)
+    
+    def _mostrar_paso_2(self, parent):
+        """Paso 2: Confirmación final"""
+        ttk.Label(parent, text="🚨 ÚLTIMA CONFIRMACIÓN", 
+                 font=("Arial", 14, "bold"), foreground="red").pack(pady=(0, 20))
+        
+        ttk.Label(parent, text="¿Estás absolutamente seguro de que deseas eliminar esta tarea?", 
+                 font=("Arial", 12)).pack(pady=(0, 10))
+        
+        ttk.Label(parent, text=f"Título: {self.tarea['titulo']}", 
+                 font=("Arial", 11, "bold")).pack(pady=(0, 20))
+        
+        # Icono de advertencia
+        ttk.Label(parent, text="⚠️", font=("Arial", 40), 
+                 foreground="red").pack(pady=(0, 20))
+        
+        ttk.Label(parent, text="Esta acción NO se puede deshacer.", 
+                 font=("Arial", 10, "bold"), foreground="red").pack(pady=(0, 20))
+        
+        # Botones
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(fill=tk.X)
+        
+        ttk.Button(btn_frame, text="🗑️ SÍ, ELIMINAR DEFINITIVAMENTE", 
+                  command=self._avanzar_paso, style="Danger.TButton").pack(side=tk.RIGHT, padx=5)
+        
+        ttk.Button(btn_frame, text="🔙 VOLVER", 
+                  command=self._retroceder_paso).pack(side=tk.RIGHT, padx=5)
+    
+    def _mostrar_paso_3(self, parent):
+        """Paso 3: Resultado"""
+        # Intentar eliminar
+        try:
+            eliminado = db.eliminar_tarea(self.tarea_id)
+            
+            if eliminado:
+                ttk.Label(parent, text="✅ TAREA ELIMINADA", 
+                         font=("Arial", 16, "bold"), foreground="green").pack(pady=(0, 20))
+                
+                ttk.Label(parent, text="La tarea ha sido eliminada correctamente.", 
+                         font=("Arial", 12)).pack(pady=(0, 20))
+                
+                ttk.Label(parent, text="✔️ Datos eliminados de la base de datos\n"
+                         "✔️ Espacio liberado\n✔️ Cambios aplicados", 
+                         font=("Arial", 10)).pack(pady=(0, 20))
+                
+                # Botón para cerrar
+                ttk.Button(parent, text="🚪 CERRAR", 
+                          command=self._cerrar_con_callback, 
+                          style="Success.TButton").pack(pady=20)
+                
+            else:
+                ttk.Label(parent, text="❌ ERROR AL ELIMINAR", 
+                         font=("Arial", 16, "bold"), foreground="red").pack(pady=(0, 20))
+                
+                ttk.Label(parent, text="No se pudo eliminar la tarea.", 
+                         font=("Arial", 12)).pack(pady=(0, 20))
+                
+                ttk.Button(parent, text="CERRAR", 
+                          command=self.top.destroy).pack(pady=20)
+                
+        except Exception as e:
+            ttk.Label(parent, text=f"❌ ERROR: {str(e)}", 
+                     font=("Arial", 12), foreground="red").pack(pady=20)
+            ttk.Button(parent, text="CERRAR", 
+                      command=self.top.destroy).pack(pady=20)
+    
+    def _avanzar_paso(self):
+        """Avanzar al siguiente paso"""
+        if self.paso_actual < self.total_pasos:
+            self.paso_actual += 1
+            self._actualizar_paso()
+    
+    def _retroceder_paso(self):
+        """Retroceder al paso anterior"""
+        if self.paso_actual > 1:
+            self.paso_actual -= 1
+            self._actualizar_paso()
+    
+    def _actualizar_paso(self):
+        """Actualizar la interfaz para el paso actual"""
+        # Actualizar barra de progreso
+        main_frame = self.top.winfo_children()[0]  # Frame principal
+        
+        # Actualizar texto del paso
+        paso_frame = main_frame.winfo_children()[0]
+        paso_label = paso_frame.winfo_children()[0]
+        paso_label.config(text=f"PASO {self.paso_actual} de {self.total_pasos}")
+        
+        # Actualizar puntos de progreso
+        progress_frame = main_frame.winfo_children()[1]
+        for i, widget in enumerate(progress_frame.winfo_children()):
+            color = "blue" if i < self.paso_actual else "gray"
+            widget.config(foreground=color)
+        
+        # Mostrar contenido del paso
+        self._mostrar_paso_actual(main_frame)
+    
+    def _cerrar_con_callback(self):
+        """Cerrar ventana y ejecutar callback"""
+        if self.callback:
+            self.callback()
+        self.top.destroy()
 # pero por brevedad las omito. Si las necesitas, dime y te las paso completas)
 
 # ============================================================================
@@ -617,12 +1024,12 @@ class SmartTaskApp:
         if not seleccion:
             messagebox.showwarning("Advertencia", "Selecciona una tarea para editar")
             return
-        
+    
         item = seleccion[0]
         tarea_id = self.tree.item(item, 'values')[0]
-        
-        # Para simplificar, mostramos mensaje
-        messagebox.showinfo("Editar", f"Editar tarea ID: {tarea_id}\n\nEsta funcionalidad requiere la clase EditarTareaDialog completa.")
+    
+        dialog = EditarTareaDialog(self.root, tarea_id, self._cargar_tareas)
+        self.root.wait_window(dialog.top)
     
     def _eliminar_tarea(self):
         """HU04 - Eliminar tarea"""
