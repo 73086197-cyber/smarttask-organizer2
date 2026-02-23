@@ -1,0 +1,63 @@
+# ===========================
+# SmartTask Organizer
+# ===========================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Entorno virtual
+.venv/
+venv/
+env/
+ENV/
+
+# Distribución / Empaquetado
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Base de datos (se recrea automáticamente al ejecutar)
+smarttask.db
+*.sqlite3
+
+# IDE / Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos temporales de prueba
+test_recording_log.txt
+*.wav
+*.tmp
+
+# Pytest / Cobertura
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+
+# Documentos de uso interno del equipo (no subir)
+GUIA_EXPOSICION.md

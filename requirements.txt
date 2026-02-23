@@ -1,0 +1,18 @@
+# DEPENDENCIAS PRINCIPALES
+sqlalchemy>=2.0.0
+
+# DEPENDENCIAS DE VOZ
+numpy>=1.21.0
+scipy>=1.7.0
+sounddevice>=0.4.6
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+matplotlib>=3.3.0
+
+# Dependencias del sistema
+python-dateutil>=2.8.2
+plyer>=2.1.0
+
+# DEPENDENCIAS DE PRUEBAS
+pytest>=7.0.0
+pytest-cov>=4.0.0

@@ -1,0 +1,37 @@
+==============================================================================
+GUÍA DEFINITIVA: CÓMO EJECUTAR EN CUALQUIER PC
+==============================================================================
+
+Para el profesor o amigos:
+
+PASO 1: REQUISITOS
+-------------------
+Asegúrate de que la computadora tenga **PYTHON** instalado.
+(Al instalarlo, deben marcar la casilla "Add Python to PATH").
+
+PASO 2: PREPARAR CARPETA
+-------------------------
+1. Copia tu carpeta "smarttask-organizer2" a la USB o envíala.
+2. IMPORTANTE: Puedes borrar la carpeta ".venv" antes de copiarla para que pese menos.
+   (El programa creará una nueva automáticamente en la otra PC).
+
+PASO 3: EJECUTAR
+-------------------------
+Dentro de la carpeta, busca el archivo con el ícono de engranaje:
+
+   👉 LAUNCHER.bat
+
+Dale DOBLE CLIC.
+Se abrirá una ventana negra que preparará todo e iniciará tu App.
+
+¡No necesitas hacer nada más!
+
+--------------------------------------
+SI ALGO FALLA...
+--------------------------------------
+- Si la ventana negra se cierra y no pasa nada:
+  Haz clic derecho en 'LAUNCHER.bat' -> Editar.
+  Verifica que no haya caracteres extraños.
+
+- Si dice "No se encuentra Python":
+  Instala Python desde python.org
